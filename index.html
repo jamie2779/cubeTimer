@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+
+<head>
+    <title>CubingClub</title>
+    <style>
+        .textRed {
+            color: crimson;
+        }
+
+        .textGreen {
+            color: lawngreen;
+        }
+
+        .textYellow {
+            color: darkgoldenrod;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+
+        .cell {
+            border: 0.1rem solid black;
+        }
+
+        .color-0 {
+            background-color: white;
+        }
+
+        .color-1 {
+            background-color: orange;
+        }
+
+        .color-2 {
+            background-color: greenyellow;
+        }
+
+        .color-3 {
+            background-color: red;
+        }
+
+        .color-4 {
+            background-color: blue;
+        }
+
+        .color-5 {
+            background-color: yellow;
+        }
+
+        #cubeTable {
+            border-collapse: collapse;
+        }
+
+        #cubeTable td {
+            width: 1.5rem;
+            height: 1.5rem;
+        }
+
+
+
+        #timer {
+            font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+        }
+
+
+
+        body {
+            -webkit-touch-callout: none;
+            /* iOS Safari */
+            -webkit-user-select: none;
+            /* Safari */
+            -ms-user-select: none;
+            /* 인터넷익스플로러 */
+            user-select: none;
+        }
+    </style>
+</head>
+
+<body>
+    <h1 id="scrambleText">SCRAMBLE</h1>
+    <table id="cubeTable"></table>
+    <h1 id="timer">0.000</h1>
+    <select name="wcaForm" id="wcaForm">
+        <option value="false">Wca규칙미적용</option>
+        <option value="true">Wca규칙적용</option>
+    </select>
+    <div id="statContainer">
+        <h3 id="countText">횟수: 0/0</h3>
+        <h3 id="avgText">평균: 00:00.00</h3>
+        <h3 id="bestText">최고기록: 00:00.00</h3>
+    </div>
+    <div id="recordContainer">
+        <button>모든 기록 삭제</button>
+        <ul></ul>
+    </div>
+    <script>
+
+
+        /**
+ * ms를 mm:ss.xx 형태로 변환해주는 함수
+ * @param {int} time 타이머에 표시될 시간(단위:ms) 
+ * @param {int} len 타이머에 표시될 소수점 이하 길이(기본:3)
+ * @returns mm:ss.xxx형태의 문자열 반환
+ */
+        function timeFormat(time, len = 3) {
+            if (time >= 60000) {
+                return `${Math.floor(time / 60000)}:${Math.floor(time % 60000 / 1000)}.${String(time % 1000).padStart(3, "0").slice(0, len)}`;
+            } else {
+                return `${Math.floor(time / 1000)}.${String(time % 1000).padStart(3, "0").slice(0, len)}`;
+            }
+        }
+
+        const cubeTable = document.querySelector("#cubeTable");
+
+        const EMPTY_CELL_CLASSNAME = "empty"
+
+        const CUBE_INIT = [
+            [   //U
+                [0, 0, 0],
+                [0, 0, 0],
+                [0, 0, 0]
+            ], [ //L
+                [1, 1, 1],
+                [1, 1, 1],
+                [1, 1, 1]
+            ], [ //F
+                [2, 2, 2],
+                [2, 2, 2],
+                [2, 2, 2]
+            ], [ //R
+                [3, 3, 3],
+                [3, 3, 3],
+                [3, 3, 3]
+            ], [ //B
+                [4, 4, 4],
+                [4, 4, 4],
+                [4, 4, 4]
+            ], [ //D
+                [5, 5, 5],
+                [5, 5, 5],
+                [5, 5, 5]
+            ],
+
+        ]
+
+        /**
+         * 회전기호를 입력받아서 회전을 실행한다
+         * @param {cube} cube 처음 큐브 상태를 입력받는다
+         * @param {Char} spin 큐브 회전기호를 입력받는다.
+         * @returns 결과값을 반환한다.
+         */
+        function spinCube(cube, spin) {
+            const plane = ["U", "L", "F", "R", "B", "D"];
+            const axis = plane.indexOf(spin);
+            let move;
+
+            if (axis === -1) {
+                return null;
+            }
+
+            //정면회전
+            for (let i = 0; i < 2; i++) {
+                move = cube[axis][0][0];
+                cube[axis][0][0] = cube[axis][1][0];
+                cube[axis][1][0] = cube[axis][2][0];
+                cube[axis][2][0] = cube[axis][2][1];
+                cube[axis][2][1] = cube[axis][2][2];
+                cube[axis][2][2] = cube[axis][1][2];
+                cube[axis][1][2] = cube[axis][0][2];
+                cube[axis][0][2] = cube[axis][0][1];
+                cube[axis][0][1] = move;
+            }
+
+            //측면회전
+            if (axis === 0) {
+                move = cube[2][0];
+                cube[2][0] = cube[3][0];
+                cube[3][0] = cube[4][0];
+                cube[4][0] = cube[1][0];
+                cube[1][0] = move;
+            } else if (axis === 1) {
+                for (let i = 0; i < 3; i++) {
+                    move = cube[0][0][0];
+                    cube[0][0][0] = cube[4][0][2];
+                    cube[4][0][2] = cube[4][1][2];
+                    cube[4][1][2] = cube[4][2][2];
+                    cube[4][2][2] = cube[5][2][0];
+                    cube[5][2][0] = cube[5][1][0];
+                    cube[5][1][0] = cube[5][0][0];
+                    cube[5][0][0] = cube[2][2][0];
+                    cube[2][2][0] = cube[2][1][0];
+                    cube[2][1][0] = cube[2][0][0];
+                    cube[2][0][0] = cube[0][2][0];
+                    cube[0][2][0] = cube[0][1][0];
+                    cube[0][1][0] = move;
+
+                }
+            } else if (axis === 2) {
+                for (let i = 0; i < 3; i++) {
+                    move = cube[0][2][0];
+                    cube[0][2][0] = cube[1][0][2];
+                    cube[1][0][2] = cube[1][1][2];
+                    cube[1][1][2] = cube[1][2][2];
+                    cube[1][2][2] = cube[5][0][0];
+                    cube[5][0][0] = cube[5][0][1];
+                    cube[5][0][1] = cube[5][0][2];
+                    cube[5][0][2] = cube[3][2][0];
+                    cube[3][2][0] = cube[3][1][0];
+                    cube[3][1][0] = cube[3][0][0];
+                    cube[3][0][0] = cube[0][2][2];
+                    cube[0][2][2] = cube[0][2][1];
+                    cube[0][2][1] = move;
+
+                }
+            } else if (axis === 3) {
+                for (let i = 0; i < 3; i++) {
+                    move = cube[0][0][2];
+                    cube[0][0][2] = cube[0][1][2];
+                    cube[0][1][2] = cube[0][2][2];
+                    cube[0][2][2] = cube[2][0][2];
+                    cube[2][0][2] = cube[2][1][2];
+                    cube[2][1][2] = cube[2][2][2];
+                    cube[2][2][2] = cube[5][0][2];
+                    cube[5][0][2] = cube[5][1][2];
+                    cube[5][1][2] = cube[5][2][2];
+                    cube[5][2][2] = cube[4][2][0];
+                    cube[4][2][0] = cube[4][1][0];
+                    cube[4][1][0] = cube[4][0][0];
+                    cube[4][0][0] = move;
+
+                }
+            } else if (axis === 4) {
+                for (let i = 0; i < 3; i++) {
+                    move = cube[0][0][0];
+                    cube[0][0][0] = cube[0][0][1];
+                    cube[0][0][1] = cube[0][0][2];
+                    cube[0][0][2] = cube[3][0][2];
+                    cube[3][0][2] = cube[3][1][2];
+                    cube[3][1][2] = cube[3][2][2];
+                    cube[3][2][2] = cube[5][2][2];
+                    cube[5][2][2] = cube[5][2][1];
+                    cube[5][2][1] = cube[5][2][0];
+                    cube[5][2][0] = cube[1][2][0];
+                    cube[1][2][0] = cube[1][1][0];
+                    cube[1][1][0] = cube[1][0][0];
+                    cube[1][0][0] = move;
+
+                }
+            } else if (axis === 5) {
+                move = cube[2][2];
+                cube[2][2] = cube[1][2];
+                cube[1][2] = cube[4][2];
+                cube[4][2] = cube[3][2];
+                cube[3][2] = move;
+            }
+
+            return cube;
+
+        }
+
+        /**
+         * 큐브의 처음상태롸 스크램블을 입력받아 섞은 큐브를 반환한다.
+         * @param {cube} icube 큐브의 처음상태
+         * @param {string} scrambe 스크램블 코드
+         * @returns 섞은 큐브
+         */
+        function scrambleCube(cube, scrambe) {
+            const plane = ["U", "L", "F", "R", "B", "D"];
+            scrambe.split(' ').join(''); //모든 공백 제거
+            if (plane.indexOf(scrambe[0]) === -1) {
+                return null;
+            }
+            const result = []
+            let code;
+            //전개구문 [...String]
+            [...scrambe].forEach(char => {
+                if (char === "2") {
+                    result.push(code);
+                } else if (char === "'") {
+                    result.push(code);
+                    result.push(code);
+                } else {
+                    if (plane.indexOf(char) === -1) {
+                        return null;
+                    }
+                    code = char;
+                    result.push(code);
+                }
+            });
+
+            result.forEach(spin => {
+                cube = spinCube(cube, spin);
+            });
+            return cube;
+
+        }
+
+
+        /**
+         * 큐브 배열이 들어오면 html에 큐브그림을 출력한다
+         * @param {cube} cube 큐브 배열
+         */
+        function generateImageFromArray(cube) {
+            cubeTable.innerHTML = "";
+            let tr;
+            let td;
+            let empty;
+
+            for (let i = 0; i < 3; i++) {
+                tr = document.createElement("tr");
+                for (let j = 0; j < 3; j++) {
+                    empty = document.createElement("td");
+                    empty.classList.add("empty");
+                    tr.appendChild(empty);
+                }
+                for (let j = 0; j < 3; j++) {
+                    td = document.createElement("td");
+                    td.classList.add("cell");
+                    td.classList.add(`color-${cube[0][i][j]}`);
+                    tr.appendChild(td);
+                }
+                for (let j = 0; j < 6; j++) {
+                    empty = document.createElement("td");
+                    empty.classList.add("empty");
+
+                    tr.appendChild(empty);
+                }
+                cubeTable.appendChild(tr);
+
+
+            }
+
+            for (let i = 0; i < 3; i++) {
+                tr = document.createElement("tr");
+                for (let k = 1; k < 5; k++) {
+                    for (let j = 0; j < 3; j++) {
+                        td = document.createElement("td");
+                        td.classList.add("cell");
+                        td.classList.add(`color-${cube[k][i][j]}`);
+                        tr.appendChild(td);
+                    }
+
+                }
+
+                cubeTable.appendChild(tr);
+
+
+            }
+
+            for (let i = 0; i < 3; i++) {
+                tr = document.createElement("tr");
+                for (let j = 0; j < 3; j++) {
+                    empty = document.createElement("td");
+                    empty.classList.add("empty");
+                    tr.appendChild(empty);
+                }
+                for (let j = 0; j < 3; j++) {
+                    td = document.createElement("td");
+                    td.classList.add("cell");
+                    td.classList.add(`color-${cube[5][i][j]}`);
+                    tr.appendChild(td);
+                }
+                for (let j = 0; j < 6; j++) {
+                    empty = document.createElement("td");
+                    empty.classList.add("empty");
+
+                    tr.appendChild(empty);
+                }
+                cubeTable.appendChild(tr);
+
+
+            }
+
+
+        }
+
+        function generateImageFromScramble(scrambe) {
+            generateImageFromArray(scrambleCube(CUBE_INIT, scrambe));
+        }
+        const scrambleText = document.querySelector("#scrambleText");
+
+        let scramble; //현재 스크램블 저장
+        /**
+         * 333큐브의 스크램블을 반환하는 함수(평행한 회전이 3연속으로 나오지 않고, 같은 회전이 2연속으로 나오지 않음)
+         * @returns 3x3x3큐브의 스크램블을 String형태로 반환한다
+         */
+        function makeScramble() {
+            const spin = [["R", "R'", "R2", "R2"], ["U", "U'", "U2", "U2"], ["F", "F'", "F2", "F2"], ["L", "L'", "L2", "L2"], ["D", "D'", "D2", "D2"], ["B", "B'", "B2", "B2"]];
+            const base = [];
+            const scramble = [];
+
+            let axis;
+            const count = Math.floor(Math.random() * 5) + 17;
+            for (let i = 0; i < count; i++) {
+                axis = Math.floor(Math.random() * 6)
+                let test = 0
+                while (base[i - 1] === axis || (base[i - 1] % 3 === axis % 3 && base[i - 2] % 3 === axis % 3)) {
+                    test += 1
+                    axis = Math.floor(Math.random() * 6)
+                }
+                base.push(axis);
+            }
+
+            base.forEach((ax) => {
+                scramble.push(spin[ax][Math.floor(Math.random() * spin[ax].length)])
+
+
+            })
+            return scramble.join(" ");
+        }
+
+        /**
+         * HTML의 스크램블을 새로운 것으로 교체하여 출력한다
+         */
+        function refrashScramble() {
+            scramble = makeScramble();
+            scrambleText.innerText = scramble;
+            generateImageFromScramble(scramble);
+        }
+
+        refrashScramble();
+        const countText = document.querySelector("#countText");
+        const avgText = document.querySelector("#avgText");
+        const bestText = document.querySelector("#bestText");
+
+        function refreshStat(records) {
+            const validLength = records.filter(record => record.judge !== "DNF").length;
+            if (validLength === 0) {
+                countText.innerText = `횟수: ${validLength}/${records.length}`;
+                avgText.innerText = `평균기록: 0:00.000`;
+                bestText.innerText = `최고기록: 0:00.000`;
+                return;
+            }
+            let sum = 0;
+            let best = Infinity;
+            records.forEach(record => {
+                if (record.judge === "+2") {
+                    time = record.time + 2000;
+                } else if (record.judge === "OK") {
+                    time = record.time;
+                } else {
+                    return;
+                }
+                sum += time;
+                if (time < best) best = time;
+            });
+
+
+            countText.innerText = `횟수: ${validLength}/${records.length}`;
+            avgText.innerText = `평균기록: ${timeFormat(sum / validLength)}`;
+            bestText.innerText = `최고기록: ${timeFormat(best)}`;
+
+        }
+        const timer = document.querySelector("#timer");
+        const wcaForm = document.querySelector("#wcaForm");
+        const recordContainer = document.querySelector("#recordContainer");
+        const recordList = recordContainer.querySelector("ul");
+        const deleteAllBtn = recordContainer.querySelector("button");
+
+
+        const GREEN_TEXT_CLASSNAME = "textGreen";
+        const RED_TEXT_CLASSNAME = "textRed";
+        const YELLOW_TEXT_CLASSNAME = "textYellow";
+        const HIDDEN_CLASSNAME = "hidden";
+
+        let records = [];
+
+        let wcaRule = false;
+        let readyTime = 0;
+        let startTime = 0;
+        let finTime = 0;
+        let isTimerOn = false;
+        let isKeyDown = false;
+        let canReady = true;
+        let canStart = false;
+        let judge = "OK";
+
+        let printTimerInterval;
+        let readyTimeout;
+        let wcaInterval;
+
+        /**
+         * 상태와 id를 입력받아서 기록을 수정함
+         * @param {int} id 해당 기록의 id
+         * @param {string} judge "OK" || "+2" || "DNF"
+         */
+        function editRecord(id, judge) {
+
+            records.forEach((_record) => {
+                if (_record.id === Number(id)) {
+                    _record.judge = judge;
+                    saveRecord();
+                    recordList.innerHTML = "";
+                    records.forEach(printRecord);
+                    return;
+                }
+            })
+        }
+
+        /**
+         * 저장된 모든 기록을 지우는 함수
+         */
+        function deleteAllRecords() {
+            records = [];
+            recordList.innerHTML = "";
+            saveRecord();
+        }
+
+        /**
+         * 삭제버튼 클릭시 해당 기록을 지우는 함수
+         * @param {event} event 
+         */
+        function deleteRecord(event) {
+            const li = event.target.parentElement;
+            li.remove();
+            records = records.filter((_record) => _record.id !== Number(li.id));
+            saveRecord();
+        }
+
+        /**
+         * records배열에 저장된 내용을 로컬스토리지에 덮어씌운다.
+         */
+        function saveRecord() {
+            localStorage.setItem("records", JSON.stringify(records));
+            refreshStat(records);
+        }
+
+
+        /**
+         * record를 받아서 화면에 표시해준다.
+         * @param {record} record id,time,judge,scramble로 이루어진 오브젝트
+         */
+        function printRecord(record) {
+            const li = document.createElement("li");
+            li.id = record.id;
+
+            const deleteBtn = document.createElement("button");
+            deleteBtn.addEventListener("click", deleteRecord);
+            deleteBtn.innerText = "❌"
+
+            const okBtn = document.createElement("button");
+            okBtn.innerText = "OK";
+            okBtn.addEventListener("click", (event) => {
+                editRecord(event.target.parentElement.id, "OK");
+
+            })
+            const plusBtn = document.createElement("button");
+            plusBtn.innerText = "+2";
+            plusBtn.addEventListener("click", (event) => {
+                editRecord(event.target.parentElement.id, "+2");
+
+            })
+            const dnfBtn = document.createElement("button");
+            dnfBtn.innerText = "DNF";
+            dnfBtn.addEventListener("click", (event) => {
+                editRecord(event.target.parentElement.id, "DNF");
+
+            })
+
+            const span = document.createElement("span");
+            if (record.judge === "DNF") {
+                span.classList.add(RED_TEXT_CLASSNAME);
+                span.innerText = `DNF(${timeFormat(Number(record.time))})`;
+            } else if (record.judge === "+2") {
+                span.classList.add(YELLOW_TEXT_CLASSNAME);
+                span.innerText = `${timeFormat(Number(record.time) + 2000)}+`
+            } else {
+                span.innerText = `${timeFormat(Number(record.time))}`
+            }
+
+            const scrambleUI = document.createElement("span");
+            scrambleUI.innerText = `[${record.scramble}]`
+
+            li.appendChild(span);
+            li.appendChild(okBtn);
+            li.appendChild(plusBtn);
+            li.appendChild(dnfBtn);
+            li.appendChild(deleteBtn);
+            li.appendChild(scrambleUI);
+
+            recordList.appendChild(li);
+
+
+        }
+
+        /**
+         * (keyup)
+         * 1.WCA규칙의 미리보기 시간을 제공한다
+         */
+
+        function previewStart() {
+            readyTime = Date.now();
+            timer.classList.add(RED_TEXT_CLASSNAME)
+            wcaInterval = setInterval(() => {
+                time = Math.floor((readyTime - Date.now() + 16000) / 1000); //15초부터 카운트 시작
+                if (time < 8) {
+                    //8초지남
+                } else if (time < 12) {
+                    //12초지남
+                }
+
+                if (time < -1) {
+                    timer.innerText = "DNF";
+                    judge = "DNF"
+                    clearInterval(wcaInterval);
+                } else if (time < 1) {
+
+                    timer.innerText = "+2";
+                    judge = "+2"
+                }
+                else {
+                    timer.innerText = `${time}`;
+                    judge = "OK"
+
+                }
+
+            }, 1);
+
+        }
+
+
+        /**
+         * (keydown)
+         * 2.준비하기위해 꾹 누를때 실행
+         */
+        function getReady() {
+            if (wcaRule) timer.classList.add(YELLOW_TEXT_CLASSNAME);
+            else timer.classList.add(RED_TEXT_CLASSNAME);
+
+            //타이머가 준비되면 실행
+            readyTimeout = setTimeout(() => {
+                canStart = true;
+                if (wcaRule) timer.classList.remove(YELLOW_TEXT_CLASSNAME);
+                else timer.classList.remove(RED_TEXT_CLASSNAME);
+                timer.classList.add(GREEN_TEXT_CLASSNAME);
+            }, 300);
+
+
+        }
+
+        /**
+         * (keyup)
+         * 3.타이머가 준비되기전 키를 땠을때 실행
+         */
+        function cancelReady() {
+            if (wcaRule) timer.classList.remove(YELLOW_TEXT_CLASSNAME);
+            else timer.classList.remove(RED_TEXT_CLASSNAME);
+
+            clearTimeout(readyTimeout);
+        }
+
+        /**
+         * (keyup)
+         * 4.타이머가 준비되고 키를 때면 실행
+         */
+        function timerStart() {
+            if (wcaRule) {
+                timer.classList.remove(RED_TEXT_CLASSNAME);
+                clearInterval(wcaInterval);
+            }
+            timer.classList.remove(GREEN_TEXT_CLASSNAME);
+
+            startTime = Date.now();
+            printTimerInterval = setInterval(() => {
+                time = Date.now() - startTime;
+                timer.innerText = timeFormat(time, 2);
+            }, 10);
+
+        }
+
+        /**
+         * (keydown)
+         * 5.타이머를 종료하고 데이터를 저장함
+         */
+        function timerEnd() {
+            finTime = Date.now();
+            clearInterval(printTimerInterval);
+            time = finTime - startTime;
+            timer.innerText = timeFormat(time);
+
+            record = {
+                id: finTime,
+                time: time,
+                judge: judge,
+                scramble: scramble,
+            }
+
+            records.push(record);
+            printRecord(record);
+            saveRecord();
+            refrashScramble();
+
+
+
+        }
+
+
+        /**
+         * 키를 눌렀을때 작동하는 함수
+         * @param {event} event
+         */
+        function keyDownHandler(event) {
+            if (canReady && !isTimerOn) {
+                getReady();
+            } else if (isTimerOn) {
+                timerEnd();
+            }
+
+
+        }
+
+        /**
+         * 키를 땠을 때 작동하는 함수
+         * @param {event} event 
+         */
+        function keyUpHandler(event) {
+            if (wcaRule) {
+                if (!canReady && !isTimerOn) {
+                    canReady = true;
+                    previewStart();
+                }
+
+            }
+            if (canReady && !canStart && !isTimerOn) {
+                cancelReady();
+            } else if (canStart && !isTimerOn) {
+                isTimerOn = true;
+                canStart = false;
+                if (wcaRule) canReady = false;
+
+                timerStart();
+            } else if (isTimerOn) {
+                isTimerOn = false;
+            }
+
+        }
+
+
+        document.addEventListener("keydown", (event) => {
+            if (isKeyDown) return;
+            isKeyDown = true;
+            if (event.code === 'Space') keyDownHandler(event);
+
+
+        });
+
+        document.addEventListener("keyup", (event) => {
+            isKeyDown = false;
+            if (event.code === 'Space') keyUpHandler(event);
+
+
+        })
+
+        document.addEventListener("touchstart", (event) => {
+            type = event.target.type
+            if (type === "submit" || type === "select-one") return;
+            keyDownHandler();
+        })
+
+        document.addEventListener("touchend", (event) => {
+            type = event.target.type
+            if (type === "submit" || type === "select-one") return;
+            keyUpHandler();
+        })
+
+        wcaForm.addEventListener("change", (event) => {
+            if (event.target.value === "true") {
+                canReady = false;
+                wcaRule = true;
+            } else {
+                wcaRule = false;
+                canReady = true;
+            }
+        })
+
+        deleteAllBtn.addEventListener("click", deleteAllRecords);
+
+        const savedRecord = localStorage.getItem("records");
+        if (savedRecord) {
+            records = JSON.parse(savedRecord);
+            records.forEach(printRecord);
+        }
+
+        refreshStat(records);
+
+
+
+    </script>
+</body>
+
+</html>
